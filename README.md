@@ -1,6 +1,10 @@
 # QSimulator.jl
 
-[![CI](https://github.com/spherical-tensor/QSimulator.jl/actions/workflows/CI.yml/badge.svg?branch=master)](https://github.com/spherical-tensor/QSimulator.jl/actions/workflows/CI.yml)
+[![CompatHelper](https://github.com/spherical-tensor/QSimulator.jl/actions/workflows/CompatHelper.yml/badge.svg)](https://github.com/spherical-tensor/QSimulator.jl/actions/workflows/CompatHelper.yml) 
+[![CI](https://github.com/spherical-tensor/QSimulator.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/spherical-tensor/QSimulator.jl/actions/workflows/CI.yml) 
+[![codecov](https://codecov.io/gh/spherical-tensor/QSimulator.jl/branch/main/graph/badge.svg?token=8LEKWIAZKJ)](https://codecov.io/gh/spherical-tensor/QSimulator.jl)
+
+
 
 QSimulator Fork from BBN-Q's original.
 
