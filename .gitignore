@@ -3,3 +3,4 @@ benchmark/*.json
 examples/.ipynb_checkpoints/*
 docs/build
 Manifest.toml
+.DS_Store
