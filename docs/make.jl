@@ -13,3 +13,7 @@ makedocs(
     pages=enabled_pages
     
 )
+
+deploydocs(
+    repo = "https://github.com/spherical-tensor/QSimulator.jl",
+)
