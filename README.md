@@ -1,6 +1,6 @@
 # QSimulator.jl
 
-[![CI](https://github.com/spherical-tensor/QSimulator.jl/actions/workflows/CI.yml/badge.svg?branch=master)](https://github.com/spherical-tensorQSimulator.jl/actions/workflows/CI.yml)
+[![CI](https://github.com/spherical-tensor/QSimulator.jl/actions/workflows/CI.yml/badge.svg?branch=master)](https://github.com/spherical-tensor/QSimulator.jl/actions/workflows/CI.yml)
 
 QSimulator Fork from BBN-Q's original.
 
