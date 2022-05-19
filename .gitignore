@@ -1,4 +1,5 @@
 *.cov
 benchmark/*.json
-doc/.ipynb_checkpoints/*
+examples/.ipynb_checkpoints/*
+docs/build
 Manifest.toml
