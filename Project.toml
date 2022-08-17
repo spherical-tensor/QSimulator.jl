@@ -1,7 +1,7 @@
 name = "QSimulator"
 uuid = "84ebd660-cff8-11e8-33d2-5334dd07f13c"
 authors = []
-version = "0.2.0"
+version = "0.2.1"
 
 [deps]
 DiffEqBase = "2b5f629d-d688-5b77-993f-72d75c75574e"
