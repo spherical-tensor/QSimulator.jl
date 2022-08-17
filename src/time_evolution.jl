@@ -58,7 +58,7 @@ function unitary_propagator(cqs::CompositeQSystem, ts::AbstractVector{<:Real}; o
     return sol.u
 end
 
-unitary_propagator(cqs::CompositeQSystem, t::Real, odeargs::ODESolverArgs=ODESolverArgs()) = unitary_propagator(cqs, [0.0, t], odeargs=odeargs)[end]
+unitary_propagator(cqs::CompositeQSystem, t::Real; odeargs::ODESolverArgs=ODESolverArgs()) = unitary_propagator(cqs, [0.0, t], odeargs=odeargs)[end]
 
 """
     unitary_state(cqs::CompositeQSystem, ts::AbstractVector{<:Real}, ψ0::Vector{<:Number})
@@ -107,7 +107,7 @@ A)vec(X)`.
 ## returns
 An array of propagators for the system at the specified times.
 """
-function me_propagator(cqs::CompositeQSystem, ts::AbstractVector{<:Real}, odeargs::ODESolverArgs=ODESolverArgs())
+function me_propagator(cqs::CompositeQSystem, ts::AbstractVector{<:Real}; odeargs::ODESolverArgs=ODESolverArgs())
     @assert issorted(ts)
     function ode(du, u, p, t)
         ham = p[3] # preallocated workspace array
