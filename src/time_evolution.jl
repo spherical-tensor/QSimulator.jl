@@ -1,17 +1,31 @@
 using LinearAlgebra: I, rmul!, mul!
 import Base.Iterators
 
-# We the more specific OrdinaryDiffEq for a significantly lighter dependency tree and build time.
+# With the more specific OrdinaryDiffEq for a significantly lighter dependency tree and build time.
 # However, this means we loose the automated solver picking. For now we use a recommended Tsit5
 # solver but it is not clear whether it is the right choice for the stiffness of the
 # Schrodinger/Lindblad equations.
 # * `Rodas4/5` does not appear to support complex equations.
 # * `DP5` used by QuantumOptics.jl also gave strange errors
 # * the `reltol` and `abstol` were chosen somewhat arbitrarily to be "good enough"
-using OrdinaryDiffEq: ODEProblem, solve, Tsit5
-
+using OrdinaryDiffEq: ODEProblem, solve, Tsit5, OrdinaryDiffEqAlgorithm
 export unitary_propagator, unitary_state, me_propagator, me_state
 export floquet_propagator, floquet_rise_fall_propagator, choose_times_floquet, decompose_times_floquet
+
+
+"""
+Struct to enable passing OrdinaryDiffEq.solve() arguments into time_evolution problems.
+Defaults to using Tsit5 with reltol=1e-6, and abstol=1e-8
+"""
+struct ODESolverArgs
+    alg::OrdinaryDiffEqAlgorithm
+    args::Dict{Symbol, Any}
+end
+
+function ODESolverArgs(alg::OrdinaryDiffEqAlgorithm=Tsit5(); args=Dict(:reltol=>1e-6, :abstol=>1e-8))
+    ODESolverArgs(alg, args)
+end 
+ 
 
 """
     unitary_propagator(cqs::CompositeQSystem, ts::AbstractVector{<:Real})
@@ -26,7 +40,7 @@ equation `dU/dt = -iHU`.
 ## returns
 An array of unitary propagators at the specified times.
 """
-function unitary_propagator(cqs::CompositeQSystem, ts::AbstractVector{<:Real})
+function unitary_propagator(cqs::CompositeQSystem, ts::AbstractVector{<:Real}; odeargs::ODESolverArgs=ODESolverArgs())
     @assert issorted(ts)
     function ode(du, u, p, t)
         ham = p[3] # preallocated workspace array
@@ -40,11 +54,11 @@ function unitary_propagator(cqs::CompositeQSystem, ts::AbstractVector{<:Real})
     u0 = Matrix{ComplexF64}(I, d, d) # start with identity
     work_ham = similar(fixed_ham) # scratch space
     prob = ODEProblem(ode, u0, (float(ts[1]), float(ts[end])), (cqs, fixed_ham, work_ham))
-    sol = solve(prob, Tsit5(); saveat=ts, save_start=true, reltol=1e-6, abstol=1e-8)
+    sol = solve(prob, odeargs.alg; saveat=ts, save_start=true, odeargs.args...)
     return sol.u
 end
 
-unitary_propagator(cqs::CompositeQSystem, t::Real) = unitary_propagator(cqs, [0.0, t])[end]
+unitary_propagator(cqs::CompositeQSystem, t::Real; odeargs::ODESolverArgs=ODESolverArgs()) = unitary_propagator(cqs, [0.0, t], odeargs=odeargs)[end]
 
 """
     unitary_state(cqs::CompositeQSystem, ts::AbstractVector{<:Real}, ψ0::Vector{<:Number})
@@ -60,7 +74,7 @@ times by solving the differential equation `dψ/dt = -iHψ`.
 ## returns
 An array of state vectors for the system at the specified times.
 """
-function unitary_state(cqs::CompositeQSystem, ts::AbstractVector{<:Real}, ψ0::Vector{<:Number})
+function unitary_state(cqs::CompositeQSystem, ts::AbstractVector{<:Real}, ψ0::Vector{<:Number}; odeargs::ODESolverArgs=ODESolverArgs())
     @assert issorted(ts)
     function ode(dψ, ψ, p, t)
         ham = p[3] # preallocated workspace array
@@ -72,11 +86,11 @@ function unitary_state(cqs::CompositeQSystem, ts::AbstractVector{<:Real}, ψ0::V
     fixed_ham = hamiltonian(cqs)
     work_ham = similar(fixed_ham)
     prob = ODEProblem(ode, ψ0, (float(ts[1]), float(ts[end])), (cqs, fixed_ham, work_ham))
-    sol = solve(prob, Tsit5(); saveat=ts, save_start=true, reltol=1e-6, abstol=1e-8)
+    sol = solve(prob, odeargs.alg; saveat=ts, save_start=true, odeargs.args...)
     return sol.u
 end
 
-unitary_state(cqs::CompositeQSystem, t::Real, ψ0::Vector{<:Number}) = unitary_state(cqs, [0.0, t], ψ0)[end]
+unitary_state(cqs::CompositeQSystem, t::Real, ψ0::Vector{<:Number}; odeargs::ODESolverArgs=ODESolverArgs()) = unitary_state(cqs, [0.0, t], ψ0, odeargs=odeargs)[end]
 
 """
     me_propagator(cqs::CompositeQSystem, ts::AbstractVector{<:Real})
@@ -93,7 +107,7 @@ A)vec(X)`.
 ## returns
 An array of propagators for the system at the specified times.
 """
-function me_propagator(cqs::CompositeQSystem, ts::AbstractVector{<:Real})
+function me_propagator(cqs::CompositeQSystem, ts::AbstractVector{<:Real}; odeargs::ODESolverArgs=ODESolverArgs())
     @assert issorted(ts)
     function ode(du, u, p, t)
         ham = p[3] # preallocated workspace array
@@ -115,12 +129,13 @@ function me_propagator(cqs::CompositeQSystem, ts::AbstractVector{<:Real})
     work_lind = similar(fixed_ham)
     d = dimension(cqs)^2
     u0 = Matrix{ComplexF64}(I, d, d) # start with identity
+
     prob = ODEProblem(ode, u0, (float(ts[1]), float(ts[end])), (cqs, fixed_ham, work_ham, bare_lind, work_lind))
-    sol = solve(prob, Tsit5(); saveat=ts, save_start=true, reltol=1e-6, abstol=1e-8)
+    sol = solve(prob, odeargs.alg; saveat=ts, save_start=true, odeargs.args...)
     return sol.u
 end
 
-me_propagator(cqs::CompositeQSystem, t::Real) = me_propagator(cqs, [0.0, t])[end]
+me_propagator(cqs::CompositeQSystem, t::Real; odeargs::ODESolverArgs=ODESolverArgs()) = me_propagator(cqs, [0.0, t], odeargs=odeargs)[end]
 
 """
     me_state(cqs::CompositeQSystem, ts::AbstractVector{<:Real}, ρ0::Matrix{<:Number})
@@ -137,7 +152,7 @@ matrix and at given times by solving the differential equation `dρ/dt = -i[H, �
 ## returns
 An array of density matrices for the system at the specified times.
 """
-function me_state(cqs::CompositeQSystem, ts::AbstractVector{<:Real}, ρ0::Matrix{<:Number})
+function me_state(cqs::CompositeQSystem, ts::AbstractVector{<:Real}, ρ0::Matrix{<:Number}; odeargs::ODESolverArgs=ODESolverArgs())
     @assert issorted(ts)
     function ode(dρ, ρ, p, t)
         ham = p[3] # preallocated workspace array
@@ -156,12 +171,13 @@ function me_state(cqs::CompositeQSystem, ts::AbstractVector{<:Real}, ρ0::Matrix
     work_ham = similar(fixed_ham)
     bare_lind = zeros(ComplexF64, size(fixed_ham))
     work_lind = similar(fixed_ham)
+    
     prob = ODEProblem(ode, ρ0, (float(ts[1]), float(ts[end])), (cqs, fixed_ham, work_ham, bare_lind, work_lind))
-    sol = solve(prob, Tsit5(); saveat=ts, save_start=true, reltol=1e-6, abstol=1e-8)
+    sol = solve(prob, odeargs.alg; saveat=ts, save_start=true, odeargs.args...)
     return sol.u
 end
 
-me_state(cqs::CompositeQSystem, t::Real, ρ0::Matrix{<:Number}) = me_state(cqs, [0.0, t], ρ0)[end]
+me_state(cqs::CompositeQSystem, t::Real, ρ0::Matrix{<:Number}; odeargs::ODESolverArgs=ODESolverArgs()) = me_state(cqs, [0.0, t], ρ0, odeargs=odeargs)[end]
 
 ######################################################
 # Define a `propagator_function` to be a function that takes a CompositeQSystem and an AbstractVector
