@@ -11,7 +11,7 @@ import Base.Iterators
 using OrdinaryDiffEq: ODEProblem, solve, Tsit5, OrdinaryDiffEqAlgorithm
 export unitary_propagator, unitary_state, me_propagator, me_state
 export floquet_propagator, floquet_rise_fall_propagator, choose_times_floquet, decompose_times_floquet
-
+export ODESolverArgs
 
 """
 Struct to enable passing OrdinaryDiffEq.solve() arguments into time_evolution problems.
