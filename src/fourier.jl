@@ -17,10 +17,10 @@ of a periodic function `f`.
 The fourier coefficient.
 """
 function fourier_coefficient(f::Function, frequency::Real, harmonic::Int)
-    T = 1/frequency
+    T = 1 / frequency
     g(t) = f(t) * exp(-2π * 1im * frequency * harmonic * t)
     integral, _ = quadgk(g, 0.0, T, atol=sqrt(eps(T)))
-    return integral/T
+    return integral / T
 end
 
 """
@@ -28,7 +28,7 @@ Representation of a Fourier series `f(t) = ∑ Aₙ e^(iωnt)`
 """
 struct FourierSeries
     frequency::Real
-    terms::Dict{Int, <:Number} # harmonic => coefficient
+    terms::Dict{Int,<:Number} # harmonic => coefficient
 end
 
 """
@@ -85,7 +85,7 @@ function rotating_frame_series(fs::FourierSeries, harmonics::AbstractVector{Int}
         int = 0.0
         for (h, c) in fs.terms
             if h != 0
-                int += c * (exp(iω * h * t) - 1)/(iω * h)
+                int += c * (exp(iω * h * t) - 1) / (iω * h)
             end
         end
         return exp(1im * int)

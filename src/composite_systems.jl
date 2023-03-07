@@ -21,12 +21,12 @@ dim(cqs::CompositeQSystem) = dimension(cqs)
 
 find_indices(cqs::CompositeQSystem, s::QSystem) = findall([sub == s for sub in cqs.subsystems])
 find_indices(cqs::CompositeQSystem, s_label::AbstractString) = findall([label(sub) == s_label for sub in cqs.subsystems])
-function find_indices(cqs::CompositeQSystem, s::Union{Vector{<:QSystem}, Vector{<:AbstractString}})
+function find_indices(cqs::CompositeQSystem, s::Union{Vector{<:QSystem},Vector{<:AbstractString}})
     return vcat([find_indices(cqs, _s) for _s in s]...)
 end
 
 """ Add a subsystem static Hamiltonian matrix to a CompositeQSystem """
-function add_hamiltonian!(cqs::CompositeQSystem, ham::AbstractMatrix{<:Number}, acting_on::Union{Q, Array{Q}}) where {Q<:QSystem}
+function add_hamiltonian!(cqs::CompositeQSystem, ham::AbstractMatrix{<:Number}, acting_on::Union{Q,Array{Q}}) where {Q<:QSystem}
     idxs = embed_indices(cqs, acting_on)
     push!(cqs.fixed_Hs, (ham, idxs))
 end
@@ -37,7 +37,7 @@ add_hamiltonian!(cqs::CompositeQSystem, qs::QSystem, ϕ::Real) = add_hamiltonian
 
 # TODO how to do this dispatch vs adding a fixed Hamiltonian - Jameson says not to do this https://discourse.julialang.org/t/functions-and-callable-methods/2983/3
 """ Add a time parameterized subsystem Hamiltonian to a CompositeQSystem """
-function add_hamiltonian!(cqs::CompositeQSystem, ham::Function, acting_on::Union{Q, Array{Q}}) where Q<:QSystem
+function add_hamiltonian!(cqs::CompositeQSystem, ham::Function, acting_on::Union{Q,Array{Q}}) where {Q<:QSystem}
     idxs = embed_indices(find_indices(cqs, acting_on), [dimension(s) for s in cqs.subsystems])
     push!(cqs.parametric_Hs, (ham, idxs))
 end
@@ -50,13 +50,13 @@ function add_parametric_hamiltonians!(ham::Matrix{<:Number}, cqs::CompositeQSyst
 end
 
 """ Add a subystem collapse static operator matrix to a CompositeQSystem """
-function add_lindblad!(cqs::CompositeQSystem, lind_op::AbstractMatrix{T}, acting_on::Union{Q, Array{Q}}) where {T<:Number, Q<:QSystem}
+function add_lindblad!(cqs::CompositeQSystem, lind_op::AbstractMatrix{T}, acting_on::Union{Q,Array{Q}}) where {T<:Number,Q<:QSystem}
     idxs = embed_indices(cqs, acting_on)
     push!(cqs.fixed_Ls, (lind_op, idxs))
 end
 
 """ Add a subystem time dependent collapse operator matrix to a CompositeQSystem """
-function add_lindblad!(cqs::CompositeQSystem, lind_op::Function, acting_on::Union{Q, Array{Q}}) where Q<:QSystem
+function add_lindblad!(cqs::CompositeQSystem, lind_op::Function, acting_on::Union{Q,Array{Q}}) where {Q<:QSystem}
     idxs = embed_indices(cqs, acting_on)
     push!(cqs.parametric_Ls, (lind_op, idxs))
 end
@@ -88,7 +88,7 @@ function embed(m::Matrix, acting_on::Vector, dims::Vector)
     @assert size(m, 1) == prod(dims[acting_on]) "Oops! Dimensions of operator do not match dims argument."
 
     # create the large matrix by tensoring on an identity term to the operator`m`
-    d_rest = prod(dims) ÷ size(m,1)
+    d_rest = prod(dims) ÷ size(m, 1)
     M = kron(m, Matrix{eltype(m)}(I, d_rest, d_rest))
 
     # Reshape into a multi-dimensional array with the dimensions given by swapped (i.e. `m` operator
@@ -119,7 +119,7 @@ function embed(m::Matrix, acting_on::Vector, dims::Vector)
     # permutation to get the current ordering with the `m` operator first; then invert and again
     # handle the way tensor product indices work e.g. if we wanted the permutation [2 1 3] (i.e.
     # swap 1st and 2nd subsystem) then we actually need to swap the 2nd and 3rd dimensions
-    reverse_perm = (l+1) .- reverse(invperm([acting_on; identity_idxs]))
+    reverse_perm = (l + 1) .- reverse(invperm([acting_on; identity_idxs]))
     IC = [reverse_perm; reverse_perm .+ l]
     M = TensorOperations.tensorcopy(M, 1:length(IC), IC)
 
@@ -137,7 +137,7 @@ function embed_indices(acting_on::Vector, dims::Vector)
     # Strategy:
     # 1. create a subystem matrix with elements equal to the linear index e.g. [1 2; 3 4]
     dim_acting_on = prod(dims[acting_on])
-    m = reshape(collect(1:dim_acting_on^2), (dim_acting_on,dim_acting_on))
+    m = reshape(collect(1:dim_acting_on^2), (dim_acting_on, dim_acting_on))
     # 2. embed the matrix
     M = embed(m, acting_on, dims)
     # 3. find where the linear indices got embedded

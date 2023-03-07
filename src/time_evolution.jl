@@ -19,13 +19,13 @@ Defaults to using Tsit5 with reltol=1e-6, and abstol=1e-8
 """
 struct ODESolverArgs
     alg::OrdinaryDiffEqAlgorithm
-    args::Dict{Symbol, Any}
+    args::Dict{Symbol,Any}
 end
 
-function ODESolverArgs(alg::OrdinaryDiffEqAlgorithm=Tsit5(); args=Dict(:reltol=>1e-6, :abstol=>1e-8))
+function ODESolverArgs(alg::OrdinaryDiffEqAlgorithm=Tsit5(); args=Dict(:reltol => 1e-6, :abstol => 1e-8))
     ODESolverArgs(alg, args)
-end 
- 
+end
+
 
 """
     unitary_propagator(cqs::CompositeQSystem, ts::AbstractVector{<:Real})
@@ -120,7 +120,7 @@ function me_propagator(cqs::CompositeQSystem, ts::AbstractVector{<:Real}; odearg
         for (lind_op, idxs) in Iterators.flatten((p[1].fixed_Ls, ((l(t), idxs) for (l, idxs) in p[1].parametric_Ls)))
             lind_mat .= p[4] # start with empty array
             embed_add!(lind_mat, lind_op, idxs)
-            du .+= 2π * (conj(lind_mat) ⊗ lind_mat .- 1//2 .* I_mat ⊗ (lind_mat'*lind_mat) .- 1//2 .* transpose(lind_mat'*lind_mat) ⊗ I_mat) * u
+            du .+= 2π * (conj(lind_mat) ⊗ lind_mat .- 1 // 2 .* I_mat ⊗ (lind_mat' * lind_mat) .- 1 // 2 .* transpose(lind_mat' * lind_mat) ⊗ I_mat) * u
         end
     end
     fixed_ham = hamiltonian(cqs)
@@ -158,20 +158,20 @@ function me_state(cqs::CompositeQSystem, ts::AbstractVector{<:Real}, ρ0::Matrix
         ham = p[3] # preallocated workspace array
         ham .= p[2] # start from fixed_ham
         add_parametric_hamiltonians!(ham, p[1], t)
-        dρ .= -2π * 1im * (ham*ρ - ρ*ham)
+        dρ .= -2π * 1im * (ham * ρ - ρ * ham)
         lind_mat = p[5] # preallocated workspace array
         for (index, (lind_op, idxs)) in enumerate([p[1].fixed_Ls; p[1].parametric_Ls])
             lind_mat .= p[4] # start with empty array
             l = index <= length(p[1].fixed_Ls) ? lind_op : lind_op(t)
             embed_add!(lind_mat, l, idxs)
-            dρ .+= 2π * (lind_mat*ρ*lind_mat' .- 1//2 .* lind_mat'*lind_mat*ρ .- 1//2 .* ρ*lind_mat'*lind_mat)
+            dρ .+= 2π * (lind_mat * ρ * lind_mat' .- 1 // 2 .* lind_mat' * lind_mat * ρ .- 1 // 2 .* ρ * lind_mat' * lind_mat)
         end
     end
     fixed_ham = hamiltonian(cqs)
     work_ham = similar(fixed_ham)
     bare_lind = zeros(ComplexF64, size(fixed_ham))
     work_lind = similar(fixed_ham)
-    
+
     prob = ODEProblem(ode, ρ0, (float(ts[1]), float(ts[end])), (cqs, fixed_ham, work_ham, bare_lind, work_lind))
     sol = solve(prob, odeargs.alg; saveat=ts, save_start=true, odeargs.args...)
     return sol.u
@@ -262,8 +262,8 @@ function choose_times_floquet(center::Real, width::Real, t_period::Real, dt::Rea
     num_times = floor(Int, width / dt)
     num_times += iseven(num_times) # make sure num_times is odd for symmetry
     width = dt * num_times
-    times = collect(range(center - width/2, stop=center + width/2, length=num_times))
-    times[ceil(Int, num_times/2)] = center
+    times = collect(range(center - width / 2, stop=center + width / 2, length=num_times))
+    times[ceil(Int, num_times / 2)] = center
     return times
 end
 
@@ -326,19 +326,19 @@ vector `ts` and the fall time is assumed to be at the end.
 A propagator function.
 """
 function floquet_rise_fall_propagator(propagator_func::Function, t_period::Real, rise_time::Real,
-                                      fall_time::Real, rtol::Real)
+    fall_time::Real, rtol::Real)
     @assert all([t_period, rise_time, fall_time] .>= 0)
     floquet_prop = floquet_propagator(propagator_func, t_period, rtol)
     function p(cqs::CompositeQSystem, ts::Vector{<:Real})
         t0, t1 = ts[1] + rise_time, ts[end] - fall_time
         @assert t0 <= t1
-        us_risetime = propagator_func(cqs, [ts[ts .< t0]; t0])
+        us_risetime = propagator_func(cqs, [ts[ts.<t0]; t0])
         u0 = us_risetime[end]
         us = us_risetime[1:end-1]
-        us_floquet = floquet_prop(cqs, [t0; ts[t0 .<= ts .<= t1]; t1])
+        us_floquet = floquet_prop(cqs, [t0; ts[t0.<=ts.<=t1]; t1])
         u1 = us_floquet[end] * u0
         append!(us, [u * u0 for u in us_floquet[2:end-1]])
-        us_falltime = propagator_func(cqs, [t1; ts[t1 .< ts]])
+        us_falltime = propagator_func(cqs, [t1; ts[t1.<ts]])
         append!(us, [u * u1 for u in us_falltime[2:end]])
         return us
     end

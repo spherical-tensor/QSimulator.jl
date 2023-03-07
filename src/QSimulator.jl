@@ -1,7 +1,6 @@
 module QSimulator
 
 export ⊗
-
 const ⊗ = kron
 
 include("fourier.jl")

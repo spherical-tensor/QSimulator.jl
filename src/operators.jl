@@ -1,5 +1,5 @@
+using DocStringExtensions
 using LinearAlgebra: diagm, lmul!
-
 export raising, lowering, number, X, Y, X_Y, XY, flip_flop,
        decay, dephasing, dipole_drive, parametric_drive, rwa_dipole
 

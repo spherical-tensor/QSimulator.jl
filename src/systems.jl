@@ -11,6 +11,7 @@ export hamiltonian, fit_transmon
 # Types
 ######################################################
 
+# TODO: Matrix{<:Number} is NOT a HermitianMatrix. remove this lie with an actual def.
 HermitianMatrix = Matrix{<:Number}
 abstract type QSpec end
 abstract type QSystem end
@@ -28,35 +29,35 @@ spec(q::QSystem)::QSpec = q.spec
 # Structs
 
 struct HermitianSpec <: QSpec
-   matrix::HermitianMatrix
-   function HermitianSpec(matrix::Matrix{<:Number})
-       @assert ishermitian(matrix)
-       return new(matrix)
-   end
+    matrix::HermitianMatrix
+    function HermitianSpec(matrix::Matrix{<:Number})
+        @assert ishermitian(matrix)
+        return new(matrix)
+    end
 end
 
 """
 Resonator, specified by its level spacing.
 """
 struct ResonatorSpec <: QSpec
-   frequency::Real
+    frequency::Real
 end
 
 """
 Transmon, specified by its charge and junctions energies, EC and EJ1/EJ2, respectively.
 """
 struct TransmonSpec <: QSpec
-   EC::Real
-   EJ1::Real
-   EJ2::Real
+    EC::Real
+    EJ1::Real
+    EJ2::Real
 end
 
 """
 Alternative Transmon specification by its f₀₁ transition frequency and anharmonicity (f₁₂ - f₀₁).
 """
 struct DuffingSpec <: QSpec
-   frequency::Real
-   anharmonicity::Real
+    frequency::Real
+    anharmonicity::Real
 end
 
 # Functions
@@ -176,7 +177,7 @@ Construct a resonator hamiltonian from energy levels equally spaced by the reson
 along the diagonal of a square matrix.
 """
 hamiltonian(r::Resonator)::HermitianMatrix =
-    diagm(0 =>[spec(r).frequency * n for n in 0:dimension(r)-1])
+    diagm(0 => [spec(r).frequency * n for n in 0:dimension(r)-1])
 
 # Duffing Transmon
 
@@ -219,12 +220,12 @@ end
 
 function hamiltonian(t::ChargeBasisTransmon, ϕ::Real=0.0)
     d = dimension(t)
-    N = floor(Int, d/2)
+    N = floor(Int, d / 2)
     s = spec(t)
     EJ = sqrt(s.EJ1^2 + s.EJ2^2 + 2 * s.EJ1 * s.EJ2 * cos(2π * ϕ))
     EC = s.EC
-    charging_term = 4 * EC * diagm(0 => (-N:N).^2)
-    tunneling_term = -0.5 * EJ * (diagm(-1 => ones(d-1), 1 => ones(d-1)))
+    charging_term = 4 * EC * diagm(0 => (-N:N) .^ 2)
+    tunneling_term = -0.5 * EJ * (diagm(-1 => ones(d - 1), 1 => ones(d - 1)))
     return charging_term + tunneling_term
 end
 
@@ -259,7 +260,7 @@ Helper function that subtracts a real number off the diagonal elements of a Real
 function subtract_number!(h::Matrix{<:Real}, r::Real)
     if r != 0
         for i in 1:size(h, 1)
-            h[i,i] -= (i-1) * r
+            h[i, i] -= (i - 1) * r
         end
     end
 end
@@ -289,12 +290,12 @@ function fit_transmon(
     freq_max::Real, freq_min::Real, anharm_max::Real, model::Type{T}, num_terms::Int
 )::TransmonSpec where {T<:Union{PerturbativeTransmon,DiagonalChargeBasisTransmon}}
     function f_fixed(params)
-      EC, EJ = params
-      t = model("", 3, TransmonSpec(EC, EJ, 0.0), num_terms=num_terms)
-      levels = diag(hamiltonian(t))
-      test_f_01 = levels[2] - levels[1]
-      test_f_12 = levels[3] - levels[2]
-      return abs(test_f_01 - freq_max) + abs(test_f_12 - test_f_01 - anharm_max)
+        EC, EJ = params
+        t = model("", 3, TransmonSpec(EC, EJ, 0.0), num_terms=num_terms)
+        levels = diag(hamiltonian(t))
+        test_f_01 = levels[2] - levels[1]
+        test_f_12 = levels[3] - levels[2]
+        return abs(test_f_01 - freq_max) + abs(test_f_12 - test_f_01 - anharm_max)
     end
 
     function f_tunable(params)
@@ -310,8 +311,8 @@ function fit_transmon(
     EC_guess = -anharm_max
     EJ_max_guess = -(freq_max - anharm_max)^2 / (8 * anharm_max)
     EJ_min_guess = -(freq_min - anharm_max)^2 / (8 * anharm_max)
-    EJ1_guess = 1//2 * (EJ_max_guess + EJ_min_guess)
-    EJ2_guess = 1//2 * abs(EJ_max_guess - EJ_min_guess)
+    EJ1_guess = 1 // 2 * (EJ_max_guess + EJ_min_guess)
+    EJ2_guess = 1 // 2 * abs(EJ_max_guess - EJ_min_guess)
     if freq_max == freq_min
         res = optimize(f_fixed, [EC_guess, EJ1_guess])
         EC, EJ = res.minimizer
