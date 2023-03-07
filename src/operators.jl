@@ -1,18 +1,24 @@
 using DocStringExtensions
 using LinearAlgebra: diagm, lmul!
 export raising, lowering, number, X, Y, X_Y, XY, flip_flop,
-       decay, dephasing, dipole_drive, parametric_drive, rwa_dipole
+    decay, dephasing, dipole_drive, parametric_drive, rwa_dipole
 
 ######################################################
 # Primitives
 ######################################################
 
+# TODO: make it symmetric; allow scaling factor for both raising and lowering instead of just lowering
 # ladder operators
+# TODO: unify the constructions for raising / lowering / number operators
 """
-    raising(q::QSystem, ϕ::Real=0.0)
+Bosonic Raising/Creation/Ladder-a† operator.
 
-raising/creation/a ladder operator. Given an eignenstate of the number operator `|n⟩` on a
-`QSystem q`, `raising(q)|n⟩ = √(n+1)|n+1⟩`. Optionally an additional phase exp(2πiϕ) is applied.
+    $(TYPEDSIGNATURES)
+
+Given an eignenstate of the number operator `|n⟩` on a
+`QSystem q`, `raising(q)|n⟩ = √(n+1)|n+1⟩`. 
+
+Optionally an additional phase exp(2πiϕ) is applied.
 
 # Examples
 ```jldoctest
@@ -28,21 +34,31 @@ julia> raising(q)
 """
 raising(q::QSystem, ϕ::Real=0.0) = raising(dimension(q), ϕ)
 
-# custom diagm because it's twice as fast for small matrices
-function raising(dim::Integer,  ϕ::Real=0.0)
+
+"""
+Matrix Representation for the Bosonic Raising Operator via `dim`` and `ϕ`.
+
+    $(TYPEDSIGNATURES)
+
+Eschewing diagm for a custom implementation because it's twice as fast for small matrices.
+"""
+function raising(dim::Integer, ϕ::Real=0.0)
     m = zeros(typeof(complex(ϕ)), dim, dim)
     fac = exp(1im * 2π * ϕ)
-    for i in 1:(dim -1 )
-        m[i + 1, i] = sqrt(i) * fac
+    for i in 1:(dim-1)
+        m[i+1, i] = sqrt(i) * fac
     end
     return m
 end
 
-"""
-    lowering(q::QSystem, ϕ::Real=0.0, factor::Real=1))
 
-lowering/destruction/a† ladder operator. Given an eignenstate of the number operator `|n⟩` on a
-`QSystem q`, `lowering(q)|n⟩ = √(n+1)|n+1⟩`. Optionally apply an additional phase ϕ and scaling `factor`.
+"""
+Bosonic Lowering/Destruction/a ladder operator. 
+
+    $(TYPEDSIGNATURES)
+
+Given an eignenstate of the number operator `|n⟩` on a
+`QSystem q`, `lowering(q)|n⟩ = √(n)|n-1⟩`. Optionally apply an additional phase ϕ and scaling `factor`.
 
 # Examples
 ```jldoctest
@@ -59,20 +75,27 @@ julia> lowering(q)
 lowering(q::QSystem, ϕ::Real=0, factor::Real=1) = lowering(dimension(q), ϕ, factor)
 
 # custom diagm because it's twice as fast for small matrices
-function lowering(dim::Integer,  ϕ::Real=0, factor::Real=1)
+"""
+Matrix Representation for the Lowering Operator via `dim`, `ϕ`, and `factor`.
+
+    $(TYPEDSIGNATURES)
+"""
+function lowering(dim::Integer, ϕ::Real=0, factor::Real=1)
     m = zeros(typeof(complex(float(ϕ))), dim, dim)
     efac = exp(-1im * 2π * ϕ) * factor
-    for i in 1:(dim - 1)
-        m[i, i + 1] = sqrt(i) * efac
+    for i in 1:(dim-1)
+        m[i, i+1] = sqrt(i) * efac
     end
     return m
 end
 
 """
-    number(q::QSystem, factor::Real=1)
+Bosonic Number Operator `a†a` on a QSystem `q`, with an optional overall scaling through `factor`.
 
-Number operator (a†a) on a QSystem `q` with an optional scaling factor which gives a dephasing
-matrix if `factor != 1`.
+    $(TYPEDSIGNATURES)
+
+Setting `factor != 1` amounts to adding dephasing to the system.
+TODO: ADD more information.
 """
 number(q::QSystem, factor::Real=1) = number(dimension(q), factor)
 
@@ -86,17 +109,25 @@ function number(dim::Integer, factor::T=1) where {T<:Real}
 end
 
 
-"""
-    X(q::QSystem)
+function X(dim::Integer)
+    # Rather than just returning raising(q) + lowering(q) we specialize this implementation because
+    # it more than twice as fast with less than half the allocations. See a4add5ca0 for details.
+    diag_elements = sqrt.(1:(dim-1))
+    diagm(-1 => diag_elements, +1 => diag_elements)
+end
 
-X (a + a†) operator on a QSystem `q`.
+"""
+Canonical Position Operator `X = a† + a` on a QSystem `q`. 
+
+    $(TYPEDSIGNATURES)
+
 """
 function X(q::QSystem)
     # Rather than just returning raising(q) + lowering(q) we specialize this implementation because
     # it more than twice as fast with less than half the allocations. See a4add5ca0 for details.
-    diag_elements = sqrt.(1:(dimension(q)-1))
-    diagm(-1 => diag_elements, +1 => diag_elements)
+    X(dimension(q))
 end
+
 
 """
 Apply a phase ϕ (units of τ) to an X operator
@@ -116,7 +147,6 @@ true
 ```
 """
 X(q::QSystem, ϕ::Real) = raising(q, ϕ) + lowering(q, ϕ)
-
 X(qs::Vector{<:QSystem}, ϕs::Vector{<:Real}) = reduce(⊗, [X(q, ϕ) for (q, ϕ) in zip(qs, ϕs)])
 X(qs::Vector{<:QSystem}) = reduce(⊗, [X(q) for q in qs])
 
@@ -127,10 +157,10 @@ Y (-ia + ia†) operator on a QSystem `q`.
 """
 function Y(q::QSystem)
     diag_elements = sqrt.(1:(dimension(q)-1))
-    diagm(-1 => 1im*diag_elements, +1 => -1im*diag_elements)
+    diagm(-1 => 1im * diag_elements, +1 => -1im * diag_elements)
 end
 
-Y(q::QSystem, ϕ::Real) = 1im*(raising(q, ϕ) - lowering(q, ϕ))
+Y(q::QSystem, ϕ::Real) = 1im * (raising(q, ϕ) - lowering(q, ϕ))
 
 Y(qs::Vector{<:QSystem}, ϕs::Vector{<:Real}) = reduce(⊗, [Y(q, ϕ) for (q, ϕ) in zip(qs, ϕs)])
 Y(qs::Vector{<:QSystem}) = reduce(⊗, [Y(q) for q in qs])
@@ -145,14 +175,14 @@ X_Y(qs::Vector{<:QSystem}) = X(qs) + Y(qs)
 Bilinear photon exchange Hamiltonian on `a` and `b`: `ab† + a†b`. For qubits corresponds to Pauli operator
 `σ⁺σ⁻ + σ⁻σ⁺`
 """
-flip_flop(a::QSystem, b::QSystem) = raising(a)⊗lowering(b) + lowering(a)⊗raising(b)
+flip_flop(a::QSystem, b::QSystem) = raising(a) ⊗ lowering(b) + lowering(a) ⊗ raising(b)
 
 """
     flip_flop(a::QSystem, b::QSystem, ϕ::Real)
 
 Apply an additional relative phase ϕ: `exp(2πiϕ)ab† + exp(-2πiϕ)a†b`
 """
-flip_flop(a::QSystem, b::QSystem, ϕ::Real) = exp(-1im*2π*ϕ)*raising(a)⊗lowering(b) + exp(1im*2π*ϕ)*lowering(b)⊗raising(b)
+flip_flop(a::QSystem, b::QSystem, ϕ::Real) = exp(-1im * 2π * ϕ) * raising(a) ⊗ lowering(b) + exp(1im * 2π * ϕ) * lowering(b) ⊗ raising(b)
 
 """
     XY(a::QSystem, b::QSystem)
@@ -160,14 +190,14 @@ flip_flop(a::QSystem, b::QSystem, ϕ::Real) = exp(-1im*2π*ϕ)*raising(a)⊗lowe
 Bilinear XY Hamiltonian on `a` and `b` which is (up to a scale) equivalent to a "flip-flop"
 Hamiltonian. XY(a,b) = XᵃXᵇ + YᵃYᵇ = 2*(ab† + a†b)
 """
-XY(a::QSystem, b::QSystem) = lmul!(2.0, flip_flop(a,b))
+XY(a::QSystem, b::QSystem) = lmul!(2.0, flip_flop(a, b))
 
 """
     XY(a::QSystem, b::QSystem, ϕ::Real)
 
 Apply an additional phase rotation to the XY Hamiltonian 2*(exp(2πiϕ)ab† + exp(-2πiϕ)a†b)
 """
-XY(a::QSystem, b::QSystem, ϕ::Real) =  lmul!(2.0, flip_flop(a,b,ϕ))
+XY(a::QSystem, b::QSystem, ϕ::Real) = lmul!(2.0, flip_flop(a, b, ϕ))
 
 
 """
