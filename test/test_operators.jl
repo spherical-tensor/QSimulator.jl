@@ -1,6 +1,6 @@
 using Test, QSimulator
-
 using LinearAlgebra: I
+
 @testset "Primitives" begin
     r = Resonator("test", 3, QSimulator.ResonatorSpec(5.5))
 
