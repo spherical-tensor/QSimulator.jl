@@ -1,16 +1,14 @@
-using DocStringExtensions
-using LinearAlgebra: diagm, lmul!
+include("bosonic_operator_matrix_defs.jl")
+
 export raising, lowering, number, X, Y, X_Y, XY, flip_flop,
     decay, dephasing, dipole_drive, parametric_drive, rwa_dipole
 
 ######################################################
-# Primitives
+# Operators Definitions for QSystem
 ######################################################
 
-# TODO: make it symmetric; allow scaling factor for both raising and lowering instead of just lowering
-# ladder operators
-# TODO: unify the constructions for raising / lowering / number operators
-"""
+_DOCSTRINGS = Dict(
+    :raising => """
 Bosonic Raising/Creation/Ladder-a† operator.
 
     $(TYPEDSIGNATURES)
@@ -20,220 +18,158 @@ Given an eignenstate of the number operator `|n⟩` on a
 
 Optionally an additional phase exp(2πiϕ) is applied.
 
-# Examples
+## Examples
 ```jldoctest
 julia> q = DuffingTransmon("q", 3, DuffingSpec(5, -0.2))
 DuffingTransmon("q", 3, DuffingSpec(5, -0.2))
 
 julia> raising(q)
 3×3 Array{Float64,2}:
- 0.0  0.0      0.0
- 1.0  0.0      0.0
- 0.0  1.41421  0.0
+    0.0  0.0      0.0
+    1.0  0.0      0.0
+    0.0  1.41421  0.0
 ```
+""",
+    :lowering => """
+ Bosonic Lowering/Destruction/a ladder operator. 
+
+     $(TYPEDSIGNATURES)
+
+ Given an eignenstate of the number operator `|n⟩` on a
+ `QSystem q`, `lowering(q)|n⟩ = √(n)|n-1⟩`. Optionally apply an additional phase ϕ and scaling `factor`.
+
+ ## Examples
+ ```jldoctest
+ julia> q = DuffingTransmon("q", 3, DuffingSpec(5, -0.2))
+ DuffingTransmon("q", 3, DuffingSpec(5, -0.2))
+
+ julia> lowering(q)
+ 3×3 Array{Float64,2}:
+     0.0  1.0  0.0
+     0.0  0.0  1.41421
+     0.0  0.0  0.0
+ ```
+ """,
+    :number => """
+ Bosonic Number Operator `a†a` on a QSystem `q`, with an optional overall scaling through `factor`.
+
+     $(TYPEDSIGNATURES)
+
+ Setting `factor != 1` amounts to adding dephasing to the system.
+ TODO: ADD more information.
+     """,
+    :X => """
+ Canonical Position Operator `X = a† + a` on a QSystem `q`. 
+
+     $(TYPEDSIGNATURES)
+
+ Optionally you  may apply a phase of ϕ (units of τ) to the X operator, and provide an overall `scale` factor.
+ """,
+    :Y => """
+Canonical Conjugate Momentum Operator `Y = im(a† - a)` on a QSystem `q`. 
+    
+    $(TYPEDSIGNATURES)
+    
+Optionally you  may apply a phase of ϕ (units of τ) to the Y operator, and provide an overall `scale` factor.
+    """
+)
+
+# """
+# Apply a phase ϕ (units of τ) to an X operator
+
+# # Examples
+# ```jldoctest
+# julia> q = DuffingTransmon("q", 2, DuffingSpec(5, -0.2))
+# DuffingTransmon("q", 2, DuffingSpec(5, -0.2))
+
+# julia> X(q, 0.25)
+# 2×2 Array{Complex{Float64},2}:
+#          0.0+0.0im  6.12323e-17-1.0im
+#  6.12323e-17+1.0im          0.0+0.0im
+
+# julia> X(q, 0.25) ≈ Y(q)
+# true
+# ```
+# """
+
 """
-raising(q::QSystem, ϕ::Real=0.0) = raising(dimension(q), ϕ)
+Internal Macro to generate the single and many body bosonic operators for
+"""
+
+for op in [:raising :lowering :X :Y]
+    quote
+        @doc $(_DOCSTRINGS[op])
+        function $(op)(q::QSystem, ϕ=0.0, scale=1)
+            $(op)(dimension(q), ϕ, scale)
+        end
+
+        """
+        Multi-Qsystem Bosonic Operator.
+            $(TYPEDSIGNATURES)
+        """
+        function $(op)(qs::AbstractVector{<:QSystem}, ϕs::AbstractVector)
+            $(op)(dimension.(qs), ϕs)
+        end
+    end |> eval
+end
 
 
 """
-Matrix Representation for the Bosonic Raising Operator via `dim`` and `ϕ`.
+    $(TYPEDSIGNATURES)
+"""
+function number(q::QSystem, scale=1, offset=0)
+    number(dimension(q), scale, offset)
+end
+
+"""
+    $(TYPEDSIGNATURES)
+"""
+function number(qs::AbstractVector{<:QSystem}, scale=1, offset=1)
+    dims = dimension.(qs)
+    kron(broadcast(dims, offset, scale)...)
+end
+
+
+######################################################
+## Two Body Operators X_Y, XY, flip_flop
+######################################################
+"""
+    $(TYPEDSIGNATURES)
+"""
+X_Y(qs::AbstractVector{<:QSystem}, ϕs::AbstractVector{<:Number}=[0,0]) = X_Y(dimension.(qs), ϕs)
+
+
+"""
+Bilinear photon exchange Hamiltonian on `a` and `b`: `ab† + a†b`.
 
     $(TYPEDSIGNATURES)
 
-Eschewing diagm for a custom implementation because it's twice as fast for small matrices.
+For qubits i.e. (d=2) systems, this corresponds to Pauli operator `σ⁺σ⁻ + σ⁻σ⁺`
+Bilinear photon exchange Hamiltonian on `a` and `b`: `ab† + a†b` with an additional relative phase.
+Apply an additional relative phase ϕ: `exp(2πiϕ)ab† + exp(-2πiϕ)a†b`.
 """
-function raising(dim::Integer, ϕ::Real=0.0)
-    m = zeros(typeof(complex(ϕ)), dim, dim)
-    fac = exp(1im * 2π * ϕ)
-    for i in 1:(dim-1)
-        m[i+1, i] = sqrt(i) * fac
-    end
-    return m
-end
+flip_flop(a::QSystem, b::QSystem, ϕ::Real=0) = flip_flop(dimension(a), dimension(b), ϕ)
 
 
 """
-Bosonic Lowering/Destruction/a ladder operator. 
+    XY(a,b) = XᵃXᵇ + YᵃYᵇ = 2*(ab† + a†b)
 
     $(TYPEDSIGNATURES)
-
-Given an eignenstate of the number operator `|n⟩` on a
-`QSystem q`, `lowering(q)|n⟩ = √(n)|n-1⟩`. Optionally apply an additional phase ϕ and scaling `factor`.
-
-# Examples
-```jldoctest
-julia> q = DuffingTransmon("q", 3, DuffingSpec(5, -0.2))
-DuffingTransmon("q", 3, DuffingSpec(5, -0.2))
-
-julia> lowering(q)
-3×3 Array{Float64,2}:
- 0.0  1.0  0.0
- 0.0  0.0  1.41421
- 0.0  0.0  0.0
-```
-"""
-lowering(q::QSystem, ϕ::Real=0, factor::Real=1) = lowering(dimension(q), ϕ, factor)
-
-# custom diagm because it's twice as fast for small matrices
-"""
-Matrix Representation for the Lowering Operator via `dim`, `ϕ`, and `factor`.
-
-    $(TYPEDSIGNATURES)
-"""
-function lowering(dim::Integer, ϕ::Real=0, factor::Real=1)
-    m = zeros(typeof(complex(float(ϕ))), dim, dim)
-    efac = exp(-1im * 2π * ϕ) * factor
-    for i in 1:(dim-1)
-        m[i, i+1] = sqrt(i) * efac
-    end
-    return m
-end
-
-"""
-Bosonic Number Operator `a†a` on a QSystem `q`, with an optional overall scaling through `factor`.
-
-    $(TYPEDSIGNATURES)
-
-Setting `factor != 1` amounts to adding dephasing to the system.
-TODO: ADD more information.
-"""
-number(q::QSystem, factor::Real=1) = number(dimension(q), factor)
-
-# custom diagm because it's twice as fast for small matrices
-function number(dim::Integer, factor::T=1) where {T<:Real}
-    m = zeros(complex(float(T)), dim, dim)
-    for i in 2:dim
-        m[i, i] = (i - 1) * factor
-    end
-    return m
-end
-
-
-function X(dim::Integer)
-    # Rather than just returning raising(q) + lowering(q) we specialize this implementation because
-    # it more than twice as fast with less than half the allocations. See a4add5ca0 for details.
-    diag_elements = sqrt.(1:(dim-1))
-    diagm(-1 => diag_elements, +1 => diag_elements)
-end
-
-"""
-Canonical Position Operator `X = a† + a` on a QSystem `q`. 
-
-    $(TYPEDSIGNATURES)
-
-"""
-function X(q::QSystem)
-    # Rather than just returning raising(q) + lowering(q) we specialize this implementation because
-    # it more than twice as fast with less than half the allocations. See a4add5ca0 for details.
-    X(dimension(q))
-end
-
-
-"""
-Apply a phase ϕ (units of τ) to an X operator
-
-# Examples
-```jldoctest
-julia> q = DuffingTransmon("q", 2, DuffingSpec(5, -0.2))
-DuffingTransmon("q", 2, DuffingSpec(5, -0.2))
-
-julia> X(q, 0.25)
-2×2 Array{Complex{Float64},2}:
-         0.0+0.0im  6.12323e-17-1.0im
- 6.12323e-17+1.0im          0.0+0.0im
-
-julia> X(q, 0.25) ≈ Y(q)
-true
-```
-"""
-X(q::QSystem, ϕ::Real) = raising(q, ϕ) + lowering(q, ϕ)
-X(qs::Vector{<:QSystem}, ϕs::Vector{<:Real}) = reduce(⊗, [X(q, ϕ) for (q, ϕ) in zip(qs, ϕs)])
-X(qs::Vector{<:QSystem}) = reduce(⊗, [X(q) for q in qs])
-
-"""
-    Y(q::QSystem)
-
-Y (-ia + ia†) operator on a QSystem `q`.
-"""
-function Y(q::QSystem)
-    diag_elements = sqrt.(1:(dimension(q)-1))
-    diagm(-1 => 1im * diag_elements, +1 => -1im * diag_elements)
-end
-
-Y(q::QSystem, ϕ::Real) = 1im * (raising(q, ϕ) - lowering(q, ϕ))
-
-Y(qs::Vector{<:QSystem}, ϕs::Vector{<:Real}) = reduce(⊗, [Y(q, ϕ) for (q, ϕ) in zip(qs, ϕs)])
-Y(qs::Vector{<:QSystem}) = reduce(⊗, [Y(q) for q in qs])
-
-X_Y(qs::Vector{<:QSystem}, ϕs::Vector{<:Real}) = X(qs, ϕs) + Y(qs, ϕs)
-X_Y(qs::Vector{<:QSystem}) = X(qs) + Y(qs)
-
-
-"""
-    flip_flop(a::QSystem, b::QSystem)
-
-Bilinear photon exchange Hamiltonian on `a` and `b`: `ab† + a†b`. For qubits corresponds to Pauli operator
-`σ⁺σ⁻ + σ⁻σ⁺`
-"""
-flip_flop(a::QSystem, b::QSystem) = raising(a) ⊗ lowering(b) + lowering(a) ⊗ raising(b)
-
-"""
-    flip_flop(a::QSystem, b::QSystem, ϕ::Real)
-
-Apply an additional relative phase ϕ: `exp(2πiϕ)ab† + exp(-2πiϕ)a†b`
-"""
-flip_flop(a::QSystem, b::QSystem, ϕ::Real) = exp(-1im * 2π * ϕ) * raising(a) ⊗ lowering(b) + exp(1im * 2π * ϕ) * lowering(b) ⊗ raising(b)
-
-"""
-    XY(a::QSystem, b::QSystem)
 
 Bilinear XY Hamiltonian on `a` and `b` which is (up to a scale) equivalent to a "flip-flop"
-Hamiltonian. XY(a,b) = XᵃXᵇ + YᵃYᵇ = 2*(ab† + a†b)
+Hamiltonian.
 """
-XY(a::QSystem, b::QSystem) = lmul!(2.0, flip_flop(a, b))
+XY(a::QSystem, b::QSystem, ϕ::Real=0) = XY(dimension(a), dimension(b), ϕ)
 
-"""
-    XY(a::QSystem, b::QSystem, ϕ::Real)
 
-Apply an additional phase rotation to the XY Hamiltonian 2*(exp(2πiϕ)ab† + exp(-2πiϕ)a†b)
-"""
-XY(a::QSystem, b::QSystem, ϕ::Real) = lmul!(2.0, flip_flop(a, b, ϕ))
-
+######################################################
+## Parametric Operators
+######################################################
 
 """
-    decay(qs::QSystem, γ:Real)
+Apply a time dependent diple drive to the system.
 
-T1 decay for a QSystem.
-
-## args
-* `qs`: a QSystem.
-* `γ`: a decay rate in frequency units. Note T1 = 1/(2πγ).
-
-## returns
-The lindblad operator for decay.
-"""
-function decay(qs::QSystem, γ::Real)
-    return lowering(qs, 0, sqrt(γ))
-end
-
-"""
-    dephasing(qs::QSystem, γ::Real)
-
-Dephasing for a QSystem.
-
-## args
-* `qs`: a QSystem.
-* `γ`: a decay rate in frequency units. Note Tϕ = 1/(2πγ).
-
-## returns
-The lindblad operator for dephasing.
-"""
-function dephasing(qs::QSystem, γ::Real)
-    return number(qs, sqrt(2γ))
-end
-
-"""
-    dipole_drive(qs::QSystem, drive::Function, rotation_rate::Real=0.0)
+    $(TYPEDSIGNATURES)
 
 Given some function of time, return a function applying a time dependent
 dipole Hamiltonian. Note that this does not use the rotating wave approximation
@@ -244,8 +180,7 @@ and therefore requires a real valued drive. See also `rwa_dipole`
 * `drive`: a function of time returning a real value.
 * `rotation_rate`: the rotation rate of a rotating frame.
 
-## returns
-A function of time.
+Returns a univariate function of time.
 """
 function dipole_drive(qs::QSystem, drive::Function, rotation_rate::Real=0.0)
     function ham(t)
@@ -256,7 +191,9 @@ function dipole_drive(qs::QSystem, drive::Function, rotation_rate::Real=0.0)
 end
 
 """
-    rwa_dipole(qs::QSystem, drive::Function)
+Apply a time dependent diple drive hamiltonian to the system under the rotating wave approximation.
+
+    $(TYPEDSIGNATURES)
 
 Given some function of time, return a function applying a time dependent
 dipole Hamiltonian under the rotating wave approximation (RWA).
@@ -266,8 +203,7 @@ dipole Hamiltonian under the rotating wave approximation (RWA).
 * `drive`: a function of time returning a real or complex value. The real
     part couples to X and the imaginary part couples to Y.
 
-## returns
-A function of time.
+Returns a univariate function of time.
 """
 function rwa_dipole(qs::QSystem, drive::Function)
     x_ham = X(qs)
@@ -280,19 +216,50 @@ function rwa_dipole(qs::QSystem, drive::Function)
 end
 
 """
-    parametric_drive(qs::QSystem, drive::Function)
+Construct a time dependent hamiltonian for a given QSystem.
 
-Given some function of time, return a function applying a
-time dependent Hamiltonian.
+    $(TYPEDSIGNATURES)
 
 ## args
 * `qs`: a QSystem with a method of `hamiltonian` accepting a function of time.
 * `drive`: a function of time returning a real value.
 
-## returns
-A function of time.
+This function requires that the `QSystem` in question has an implementation of
+    hamiltonian(qs::QSystem, drive::Function) 
+
+Currently we can generate only a single parameter hamiltonian. This is a limitation we hope to lift in the future.
 """
 function parametric_drive(qs::QSystem, drive::Function)
     ham(t) = hamiltonian(qs, drive(t))
     return ham
+end
+
+######################################################
+### Fixed in Time Lindblad Operators
+######################################################
+
+"""
+Contrust lindblad operator matrix representation for simulating T1 decay on a bosonic `Qsystem`.
+
+    $(TYPEDSIGNATURES)
+
+    `γ` : non negative decay rate
+
+"""
+function decay(qs::QSystem, γ::Real)
+    @assert γ >= 0 "Decay rate γ must be non-negative."
+    return lowering(qs, 0, sqrt(γ))
+end
+
+"""
+Contrust lindblad operator matrix representation for simulating T2 decay on a bosonic `Qsystem`.
+
+    $(TYPEDSIGNATURES)
+
+    `γ` : non-negative decay rate
+
+"""
+function dephasing(qs::QSystem, γ::Real)
+    @assert γ >= 0 "Decay rate γ must be non-negative."
+    return number(qs, sqrt(2γ))
 end
