@@ -1,5 +1,5 @@
 using LinearAlgebra: I
-import TensorOperations
+using TensorOperations: tensorcopy
 
 export CompositeQSystem, add_hamiltonian!, add_lindblad!
 
@@ -121,7 +121,7 @@ function embed(m::Matrix, acting_on::Vector, dims::Vector)
     # swap 1st and 2nd subsystem) then we actually need to swap the 2nd and 3rd dimensions
     reverse_perm = (l + 1) .- reverse(invperm([acting_on; identity_idxs]))
     IC = [reverse_perm; reverse_perm .+ l]
-    M = TensorOperations.tensorcopy(M, 1:length(IC), IC)
+    M = tensorcopy(M, 1:length(IC), IC)
 
     # reshape back
     return reshape(M, prod(dims), prod(dims))

@@ -1,4 +1,5 @@
 module QSimulator
+using DocStringExtensions
 
 export ⊗
 const ⊗ = kron

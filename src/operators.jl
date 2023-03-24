@@ -7,7 +7,7 @@ export raising, lowering, number, X, Y, X_Y, XY, flip_flop,
 # Operators Definitions for QSystem
 ######################################################
 
-_DOCSTRINGS = Dict(
+const _DOCSTRINGS = Dict(
     :raising => """
 Bosonic Raising/Creation/Ladder-a† operator.
 
@@ -97,7 +97,7 @@ Internal Macro to generate the single and many body bosonic operators for
 """
 
 for op in [:raising :lowering :X :Y]
-    quote
+    expr = quote
         @doc $(_DOCSTRINGS[op])
         function $(op)(q::QSystem, ϕ=0.0, scale=1)
             $(op)(dimension(q), ϕ, scale)
@@ -110,7 +110,8 @@ for op in [:raising :lowering :X :Y]
         function $(op)(qs::AbstractVector{<:QSystem}, ϕs::AbstractVector)
             $(op)(dimension.(qs), ϕs)
         end
-    end |> eval
+    end
+    @eval $expr
 end
 
 

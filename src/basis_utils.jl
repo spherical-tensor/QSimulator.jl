@@ -1,6 +1,5 @@
 using Base.Iterators: product
 import Base: vec, getindex
-
 export TensorProductBasis, TensorProductBasisState, basis_states
 
 """

@@ -1,14 +1,11 @@
 using LinearAlgebra: I, rmul!, mul!
-import Base.Iterators
-
-# With the more specific OrdinaryDiffEq for a significantly lighter dependency tree and build time.
-# However, this means we loose the automated solver picking. For now we use a recommended Tsit5
-# solver but it is not clear whether it is the right choice for the stiffness of the
-# Schrodinger/Lindblad equations.
+using Base.Iterators: flatten
+using OrdinaryDiffEq: ODEProblem, solve, Tsit5, OrdinaryDiffEqAlgorithm
+# TODO: investigate and document which algorithm is the right choice for stiffness of the ODEs. 
 # * `Rodas4/5` does not appear to support complex equations.
 # * `DP5` used by QuantumOptics.jl also gave strange errors
 # * the `reltol` and `abstol` were chosen somewhat arbitrarily to be "good enough"
-using OrdinaryDiffEq: ODEProblem, solve, Tsit5, OrdinaryDiffEqAlgorithm
+
 export unitary_propagator, unitary_state, me_propagator, me_state
 export floquet_propagator, floquet_rise_fall_propagator, choose_times_floquet, decompose_times_floquet
 export ODESolverArgs
@@ -117,7 +114,7 @@ function me_propagator(cqs::CompositeQSystem, ts::AbstractVector{<:Real}; odearg
         I_mat = Matrix{ComplexF64}(I, d, d)
         mul!(du, -2π * 1im * (I_mat ⊗ ham - transpose(ham) ⊗ I_mat), u)
         lind_mat = p[5] # preallocated workspace array
-        for (lind_op, idxs) in Iterators.flatten((p[1].fixed_Ls, ((l(t), idxs) for (l, idxs) in p[1].parametric_Ls)))
+        for (lind_op, idxs) in flatten((p[1].fixed_Ls, ((l(t), idxs) for (l, idxs) in p[1].parametric_Ls)))
             lind_mat .= p[4] # start with empty array
             embed_add!(lind_mat, lind_op, idxs)
             du .+= 2π * (conj(lind_mat) ⊗ lind_mat .- 1 // 2 .* I_mat ⊗ (lind_mat' * lind_mat) .- 1 // 2 .* transpose(lind_mat' * lind_mat) ⊗ I_mat) * u
